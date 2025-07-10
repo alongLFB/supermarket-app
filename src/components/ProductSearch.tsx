@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { useProducts } from "@/contexts/ProductContext";
 import { Product } from "@/types/product";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function ProductSearch() {
   const { getProductByBarcode } = useProducts();
@@ -21,7 +22,12 @@ export default function ProductSearch() {
   const [searchResult, setSearchResult] = useState<Product | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
+  const [showPurchasePrice, setShowPurchasePrice] = useState(false);
   const scannerRef = useRef<HTMLDivElement>(null);
+
+  const togglePurchasePrice = () => {
+    setShowPurchasePrice(!showPurchasePrice);
+  };
 
   const handleSearch = (searchBarcode: string) => {
     if (!searchBarcode.trim()) {
@@ -186,9 +192,27 @@ export default function ProductSearch() {
               <h3 className="font-semibold text-lg">{searchResult.name}</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">进货价</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    进货价
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={togglePurchasePrice}
+                      className="h-6 w-6 p-0"
+                    >
+                      {showPurchasePrice ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                   <p className="font-medium">
-                    ¥{searchResult.purchasePrice.toFixed(2)}
+                    {showPurchasePrice ? (
+                      `¥${searchResult.purchasePrice.toFixed(2)}`
+                    ) : (
+                      <span className="text-gray-400">***</span>
+                    )}
                   </p>
                 </div>
                 <div>

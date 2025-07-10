@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useProducts } from "@/contexts/ProductContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +13,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function ProductList() {
   const { products, clearAllProducts, exportProducts, importProducts } =
     useProducts();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPurchasePrice, setShowPurchasePrice] = useState(false);
+
+  const togglePurchasePrice = () => {
+    setShowPurchasePrice(!showPurchasePrice);
+  };
 
   const handleClearAll = () => {
     if (confirm("确定要清空所有商品数据吗？此操作不可恢复。")) {
@@ -103,7 +109,23 @@ export default function ProductList() {
                 <TableRow>
                   <TableHead>产品条形码</TableHead>
                   <TableHead>名称</TableHead>
-                  <TableHead>进货价</TableHead>
+                  <TableHead>
+                    <div className="flex items-center gap-2">
+                      进货价
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={togglePurchasePrice}
+                        className="h-6 w-6 p-0"
+                      >
+                        {showPurchasePrice ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </TableHead>
                   <TableHead>售价</TableHead>
                   <TableHead>数量</TableHead>
                   <TableHead>添加时间</TableHead>
@@ -116,7 +138,13 @@ export default function ProductList() {
                       {product.barcode}
                     </TableCell>
                     <TableCell>{product.name}</TableCell>
-                    <TableCell>¥{product.purchasePrice.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {showPurchasePrice ? (
+                        `¥${product.purchasePrice.toFixed(2)}`
+                      ) : (
+                        <span className="text-gray-400">***</span>
+                      )}
+                    </TableCell>
                     <TableCell>¥{product.sellingPrice.toFixed(2)}</TableCell>
                     <TableCell>{product.quantity}</TableCell>
                     <TableCell>{product.createdAt.toLocaleString()}</TableCell>
