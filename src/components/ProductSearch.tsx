@@ -39,42 +39,100 @@ export default function ProductSearch() {
   };
 
   const startScanning = () => {
-    if (!scannerRef.current) return;
+    console.log("开始扫码，scannerRef.current:", scannerRef.current);
 
     setIsScanning(true);
 
-    const html5QrCodeScanner = new Html5QrcodeScanner(
-      "qr-reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      false
-    );
-
-    html5QrCodeScanner.render(
-      (decodedText) => {
-        setBarcode(decodedText);
-        handleSearch(decodedText);
-        stopScanning();
-      },
-      (errorMessage) => {
-        console.log("Scanning error:", errorMessage);
+    // 等待DOM更新后再初始化扫描器
+    setTimeout(() => {
+      if (!scannerRef.current) {
+        console.error("Scanner ref is null after DOM update");
+        setIsScanning(false);
+        return;
       }
-    );
 
-    setScanner(html5QrCodeScanner);
+      try {
+        const html5QrCodeScanner = new Html5QrcodeScanner(
+          "qr-reader",
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            // 优化扫描配置
+            rememberLastUsedCamera: true,
+            showTorchButtonIfSupported: true,
+            showZoomSliderIfSupported: true,
+          },
+          false
+        );
+
+        html5QrCodeScanner.render(
+          (decodedText) => {
+            console.log("扫描成功:", decodedText);
+            setBarcode(decodedText);
+            handleSearch(decodedText);
+            // 立即停止扫描器，避免继续扫描
+            html5QrCodeScanner
+              .clear()
+              .then(() => {
+                console.log("扫描成功后立即清理完成");
+              })
+              .catch((error) => {
+                console.error("扫描成功后清理失败:", error);
+              });
+            setScanner(null);
+            setIsScanning(false);
+          },
+          (errorMessage) => {
+            // 只在扫描状态下记录错误，避免清理过程中的错误
+            if (isScanning) {
+              // 只记录严重错误，忽略常见的解析错误
+              if (
+                !errorMessage.includes("NotFoundException") &&
+                !errorMessage.includes("No MultiFormat Readers")
+              ) {
+                console.log("Scanning error:", errorMessage);
+              }
+            }
+          }
+        );
+
+        setScanner(html5QrCodeScanner);
+      } catch (error) {
+        console.error("扫码初始化失败:", error);
+        setIsScanning(false);
+      }
+    }, 200); // 增加延迟时间
   };
 
   const stopScanning = () => {
+    console.log("停止扫码");
+    setIsScanning(false); // 先设置状态，停止错误日志
+
     if (scanner) {
-      scanner.clear();
-      setScanner(null);
+      try {
+        // 异步清理扫描器
+        scanner
+          .clear()
+          .then(() => {
+            console.log("扫描器清理成功");
+          })
+          .catch((error) => {
+            console.error("清理扫描器失败:", error);
+          });
+        setScanner(null);
+      } catch (error) {
+        console.error("清理扫描器失败:", error);
+      }
     }
-    setIsScanning(false);
   };
 
   useEffect(() => {
     return () => {
       if (scanner) {
-        scanner.clear();
+        scanner.clear().catch(() => {
+          // 忽略错误
+        });
       }
     };
   }, [scanner]);
@@ -86,20 +144,27 @@ export default function ProductSearch() {
         <CardDescription>通过条形码查找商品信息</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex space-x-2">
-          <div className="flex-1">
-            <Label htmlFor="search-barcode">条形码</Label>
+        <div className="space-y-2">
+          <Label htmlFor="search-barcode">条形码</Label>
+          <div className="flex space-x-2">
             <Input
               id="search-barcode"
               placeholder="输入条形码或扫描"
+              className="flex-1"
               value={barcode}
               onChange={(e) => handleInputChange(e.target.value)}
             />
-          </div>
-          <div className="flex flex-col justify-end">
             <Button
-              onClick={isScanning ? stopScanning : startScanning}
-              variant={isScanning ? "destructive" : "default"}
+              type="button"
+              onClick={() => {
+                console.log("扫码按钮点击, isScanning:", isScanning);
+                if (isScanning) {
+                  stopScanning();
+                } else {
+                  startScanning();
+                }
+              }}
+              variant={isScanning ? "destructive" : "outline"}
             >
               {isScanning ? "停止扫描" : "扫码"}
             </Button>

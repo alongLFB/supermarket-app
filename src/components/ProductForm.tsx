@@ -45,42 +45,101 @@ export default function ProductForm() {
   });
 
   const startScanning = () => {
-    if (!scannerRef.current) return;
+    console.log("开始扫码，scannerRef.current:", scannerRef.current);
 
     setIsScanning(true);
 
-    const html5QrCodeScanner = new Html5QrcodeScanner(
-      "barcode-reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      false
-    );
-
-    html5QrCodeScanner.render(
-      (decodedText) => {
-        setValue("barcode", decodedText);
-        stopScanning();
-        toast.success("条形码扫描成功！");
-      },
-      (errorMessage) => {
-        console.log("Scanning error:", errorMessage);
+    // 等待DOM更新后再初始化扫描器
+    setTimeout(() => {
+      if (!scannerRef.current) {
+        console.error("Scanner ref is null after DOM update");
+        setIsScanning(false);
+        return;
       }
-    );
 
-    setScanner(html5QrCodeScanner);
+      try {
+        const html5QrCodeScanner = new Html5QrcodeScanner(
+          "barcode-reader",
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            // 优化扫描配置
+            rememberLastUsedCamera: true,
+            showTorchButtonIfSupported: true,
+            showZoomSliderIfSupported: true,
+          },
+          false
+        );
+
+        html5QrCodeScanner.render(
+          (decodedText) => {
+            console.log("扫描成功:", decodedText);
+            setValue("barcode", decodedText);
+            toast.success("条形码扫描成功！");
+            // 立即停止扫描器，避免继续扫描
+            html5QrCodeScanner
+              .clear()
+              .then(() => {
+                console.log("扫描成功后立即清理完成");
+              })
+              .catch((error) => {
+                console.error("扫描成功后清理失败:", error);
+              });
+            setScanner(null);
+            setIsScanning(false);
+          },
+          (errorMessage) => {
+            // 只在扫描状态下记录错误，避免清理过程中的错误
+            if (isScanning) {
+              // 只记录严重错误，忽略常见的解析错误
+              if (
+                !errorMessage.includes("NotFoundException") &&
+                !errorMessage.includes("No MultiFormat Readers")
+              ) {
+                console.log("Scanning error:", errorMessage);
+              }
+            }
+          }
+        );
+
+        setScanner(html5QrCodeScanner);
+      } catch (error) {
+        console.error("扫码初始化失败:", error);
+        toast.error("扫码功能初始化失败，请检查摄像头权限");
+        setIsScanning(false);
+      }
+    }, 200); // 增加延迟时间
   };
 
   const stopScanning = () => {
+    console.log("停止扫码");
+    setIsScanning(false); // 先设置状态，停止错误日志
+
     if (scanner) {
-      scanner.clear();
-      setScanner(null);
+      try {
+        // 异步清理扫描器
+        scanner
+          .clear()
+          .then(() => {
+            console.log("扫描器清理成功");
+          })
+          .catch((error) => {
+            console.error("清理扫描器失败:", error);
+          });
+        setScanner(null);
+      } catch (error) {
+        console.error("清理扫描器失败:", error);
+      }
     }
-    setIsScanning(false);
   };
 
   useEffect(() => {
     return () => {
       if (scanner) {
-        scanner.clear();
+        scanner.clear().catch(() => {
+          // 忽略错误
+        });
       }
     };
   }, [scanner]);
@@ -117,7 +176,14 @@ export default function ProductForm() {
               />
               <Button
                 type="button"
-                onClick={isScanning ? stopScanning : startScanning}
+                onClick={() => {
+                  console.log("扫码按钮点击, isScanning:", isScanning);
+                  if (isScanning) {
+                    stopScanning();
+                  } else {
+                    startScanning();
+                  }
+                }}
                 variant={isScanning ? "destructive" : "outline"}
               >
                 {isScanning ? "停止扫描" : "扫码"}
