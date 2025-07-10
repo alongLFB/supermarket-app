@@ -12,7 +12,9 @@ export default function Home() {
   return (
     <ProductProvider>
       <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-center mb-8">超市管理系统</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">
+          虎存超市管理系统
+        </h1>
 
         <Tabs defaultValue="add" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
