@@ -17,7 +17,7 @@ import { Product } from "@/types/product";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function ProductSearch() {
-  const { getProductByBarcode } = useProducts();
+  const { getProductByBarcode, isLoaded } = useProducts();
   const [barcode, setBarcode] = useState("");
   const [searchResult, setSearchResult] = useState<Product | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -58,16 +58,33 @@ export default function ProductSearch() {
       }
 
       try {
+        // 动态计算扫描区域尺寸
+        const screenWidth = window.innerWidth;
+        const scannerWidth = Math.min(screenWidth * 0.85, 400); // 屏幕宽度的85%，最大400px
+        const scannerHeight = Math.round(scannerWidth * 0.6); // 宽高比 5:3 (适合条形码)
+
         const html5QrCodeScanner = new Html5QrcodeScanner(
           "qr-reader",
           {
             fps: 10,
-            qrbox: { width: 250, height: 250 },
+            // 动态计算的扫描区域：宽度接近屏幕宽度，高度按比例
+            qrbox: { width: scannerWidth, height: scannerHeight },
             aspectRatio: 1.0,
             // 优化扫描配置
             rememberLastUsedCamera: true,
             showTorchButtonIfSupported: true,
             showZoomSliderIfSupported: true,
+            // 默认使用后置摄像头
+            videoConstraints: {
+              facingMode: "environment",
+            },
+            // 只扫描一维码（条形码），不扫描二维码
+            formatsToSupport: [
+              // 常见的一维码格式
+              5, // CODE_128
+              9, // EAN_13
+              10, // EAN_8
+            ],
           },
           false
         );
@@ -150,91 +167,101 @@ export default function ProductSearch() {
         <CardDescription>通过条形码查找商品信息</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="search-barcode">条形码</Label>
-          <div className="flex space-x-2">
-            <Input
-              id="search-barcode"
-              placeholder="输入条形码或扫描"
-              className="flex-1"
-              value={barcode}
-              onChange={(e) => handleInputChange(e.target.value)}
-            />
-            <Button
-              type="button"
-              onClick={() => {
-                console.log("扫码按钮点击, isScanning:", isScanning);
-                if (isScanning) {
-                  stopScanning();
-                } else {
-                  startScanning();
-                }
-              }}
-              variant={isScanning ? "destructive" : "outline"}
-            >
-              {isScanning ? "停止扫描" : "扫码"}
-            </Button>
+        {!isLoaded ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">加载中...</p>
           </div>
-        </div>
-
-        {isScanning && (
-          <div className="border rounded-lg p-4">
-            <div id="qr-reader" ref={scannerRef}></div>
-          </div>
-        )}
-
-        {/* 搜索结果展示 */}
-        <div className="border rounded-lg p-4">
-          {!barcode ? (
-            <p className="text-center text-gray-500">请输入条形码进行查询</p>
-          ) : searchResult ? (
+        ) : (
+          <>
             <div className="space-y-2">
-              <h3 className="font-semibold text-lg">{searchResult.name}</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    进货价
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={togglePurchasePrice}
-                      className="h-6 w-6 p-0"
-                    >
-                      {showPurchasePrice ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <p className="font-medium">
-                    {showPurchasePrice ? (
-                      `¥${searchResult.purchasePrice.toFixed(2)}`
-                    ) : (
-                      <span className="text-gray-400">***</span>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">售价</p>
-                  <p className="font-medium">
-                    ¥{searchResult.sellingPrice.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">库存</p>
-                  <p className="font-medium">{searchResult.quantity}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">条形码</p>
-                  <p className="font-medium">{searchResult.barcode}</p>
-                </div>
+              <Label htmlFor="search-barcode">条形码</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="search-barcode"
+                  placeholder="输入条形码或扫描"
+                  className="flex-1"
+                  value={barcode}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  onClick={() => {
+                    console.log("扫码按钮点击, isScanning:", isScanning);
+                    if (isScanning) {
+                      stopScanning();
+                    } else {
+                      startScanning();
+                    }
+                  }}
+                  variant={isScanning ? "destructive" : "outline"}
+                >
+                  {isScanning ? "停止扫描" : "扫码"}
+                </Button>
               </div>
             </div>
-          ) : (
-            <p className="text-center text-red-500">未找到对应的商品</p>
-          )}
-        </div>
+
+            {isScanning && (
+              <div className="border rounded-lg p-4">
+                <div id="qr-reader" ref={scannerRef}></div>
+              </div>
+            )}
+
+            {/* 搜索结果展示 */}
+            <div className="border rounded-lg p-4">
+              {!barcode ? (
+                <p className="text-center text-gray-500">
+                  请输入条形码进行查询
+                </p>
+              ) : searchResult ? (
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">{searchResult.name}</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        进货价
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={togglePurchasePrice}
+                          className="h-6 w-6 p-0"
+                        >
+                          {showPurchasePrice ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="font-medium">
+                        {showPurchasePrice ? (
+                          `¥${searchResult.purchasePrice.toFixed(2)}`
+                        ) : (
+                          <span className="text-gray-400">***</span>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">售价</p>
+                      <p className="font-medium">
+                        ¥{searchResult.sellingPrice.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">库存</p>
+                      <p className="font-medium">{searchResult.quantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">条形码</p>
+                      <p className="font-medium">{searchResult.barcode}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-center text-red-500">未找到对应的商品</p>
+              )}
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

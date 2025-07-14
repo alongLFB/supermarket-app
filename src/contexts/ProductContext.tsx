@@ -17,6 +17,7 @@ interface ProductContextType {
   clearAllProducts: () => void;
   exportProducts: () => void;
   importProducts: (file: File) => Promise<boolean>;
+  isLoaded: boolean;
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
@@ -66,23 +67,28 @@ export function useProducts() {
 
 export function ProductProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // 组件挂载时从 localStorage 加载数据
   useEffect(() => {
     const savedProducts = loadProductsFromStorage();
     setProducts(savedProducts);
+    setIsLoaded(true);
   }, []);
 
-  // 当商品列表变化时保存到 localStorage
+  // 当商品列表变化时保存到 localStorage（只在加载完成后）
   useEffect(() => {
-    if (products.length > 0 || localStorage.getItem(STORAGE_KEY)) {
+    if (
+      isLoaded &&
+      (products.length > 0 || localStorage.getItem(STORAGE_KEY))
+    ) {
       saveProductsToStorage(products);
     }
-  }, [products]);
+  }, [products, isLoaded]);
 
   const addProduct = useCallback((productData: ProductFormData) => {
     const newProduct: Product = {
-      id: Date.now().toString(),
+      id: `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       ...productData,
       createdAt: new Date(),
     };
@@ -171,6 +177,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         clearAllProducts,
         exportProducts,
         importProducts,
+        isLoaded,
       }}
     >
       {children}

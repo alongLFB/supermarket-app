@@ -16,14 +16,35 @@ import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function ProductList() {
-  const { products, clearAllProducts, exportProducts, importProducts } =
-    useProducts();
+  const {
+    products,
+    clearAllProducts,
+    exportProducts,
+    importProducts,
+    isLoaded,
+  } = useProducts();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPurchasePrice, setShowPurchasePrice] = useState(false);
 
   const togglePurchasePrice = () => {
     setShowPurchasePrice(!showPurchasePrice);
   };
+
+  // 如果数据还没加载完成，显示加载状态
+  if (!isLoaded) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>商品列表</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <p className="text-gray-500">加载中...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleClearAll = () => {
     if (confirm("确定要清空所有商品数据吗？此操作不可恢复。")) {

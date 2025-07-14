@@ -58,16 +58,33 @@ export default function ProductForm() {
       }
 
       try {
+        // 动态计算扫描区域尺寸
+        const screenWidth = window.innerWidth;
+        const scannerWidth = Math.min(screenWidth * 0.85, 400); // 屏幕宽度的85%，最大400px
+        const scannerHeight = Math.round(scannerWidth * 0.6); // 宽高比 5:3 (适合条形码)
+
         const html5QrCodeScanner = new Html5QrcodeScanner(
           "barcode-reader",
           {
             fps: 10,
-            qrbox: { width: 250, height: 250 },
+            // 动态计算的扫描区域：宽度接近屏幕宽度，高度按比例
+            qrbox: { width: scannerWidth, height: scannerHeight },
             aspectRatio: 1.0,
             // 优化扫描配置
             rememberLastUsedCamera: true,
             showTorchButtonIfSupported: true,
             showZoomSliderIfSupported: true,
+            // 默认使用后置摄像头
+            videoConstraints: {
+              facingMode: "environment",
+            },
+            // 只扫描一维码（条形码），不扫描二维码
+            formatsToSupport: [
+              // 常见的一维码格式
+              5, // CODE_128
+              9, // EAN_13
+              10, // EAN_8
+            ],
           },
           false
         );
