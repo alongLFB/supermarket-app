@@ -66,7 +66,7 @@ export default function ProductSearch() {
         const html5QrCodeScanner = new Html5QrcodeScanner(
           "qr-reader",
           {
-            fps: 10,
+            fps: 8, // 降低帧率，提高稳定性
             // 动态计算的扫描区域：宽度接近屏幕宽度，高度按比例
             qrbox: { width: scannerWidth, height: scannerHeight },
             aspectRatio: 1.0,
@@ -74,17 +74,14 @@ export default function ProductSearch() {
             rememberLastUsedCamera: true,
             showTorchButtonIfSupported: true,
             showZoomSliderIfSupported: true,
-            // 默认使用后置摄像头
+            // 针对 iPhone 的优化配置
             videoConstraints: {
               facingMode: "environment",
+              width: { ideal: 1280 }, // 设置理想的分辨率
+              height: { ideal: 720 },
             },
-            // 只扫描一维码（条形码），不扫描二维码
-            formatsToSupport: [
-              // 常见的一维码格式
-              5, // CODE_128
-              9, // EAN_13
-              10, // EAN_8
-            ],
+            // 移除 formatsToSupport 配置，使用默认支持所有格式
+            // 这样可以避免格式枚举值的兼容性问题
           },
           false
         );
