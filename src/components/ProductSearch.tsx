@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,9 +21,53 @@ export default function ProductSearch() {
   const [barcode, setBarcode] = useState("");
   const [searchResult, setSearchResult] = useState<Product | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
+  const [scanner, setScanner] = useState<Html5Qrcode | null>(null);
   const [showPurchasePrice, setShowPurchasePrice] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const scannerRef = useRef<HTMLDivElement>(null);
+
+  // 检测客户端渲染
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // 检测移动设备
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      const checkMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+      setIsMobile(checkMobile);
+    }
+  }, []);
+
+  // 获取最佳摄像头
+  const getBestCamera = async () => {
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      console.log("可用摄像头:", cameras);
+
+      // 优先匹配名称包含 back 的摄像头（不区分大小写）
+      let bestCamera = cameras.find(
+        (camera) =>
+          camera.label.toLowerCase().includes("back") ||
+          camera.label.toLowerCase().includes("rear")
+      );
+
+      // 如果没有找到后摄像头，使用第一个摄像头
+      if (!bestCamera && cameras.length > 0) {
+        bestCamera = cameras[0];
+      }
+
+      console.log("选择的摄像头:", bestCamera);
+      return bestCamera;
+    } catch (error) {
+      console.error("获取摄像头失败:", error);
+      return null;
+    }
+  };
 
   const togglePurchasePrice = () => {
     setShowPurchasePrice(!showPurchasePrice);
@@ -44,13 +88,13 @@ export default function ProductSearch() {
     handleSearch(value);
   };
 
-  const startScanning = () => {
+  const startScanning = async () => {
     console.log("开始扫码，scannerRef.current:", scannerRef.current);
 
     setIsScanning(true);
 
     // 等待DOM更新后再初始化扫描器
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!scannerRef.current) {
         console.error("Scanner ref is null after DOM update");
         setIsScanning(false);
@@ -58,58 +102,73 @@ export default function ProductSearch() {
       }
 
       try {
+        // 获取最佳摄像头
+        const bestCamera = await getBestCamera();
+        if (!bestCamera) {
+          console.error("没有可用的摄像头");
+          setIsScanning(false);
+          return;
+        }
+
         // 动态计算扫描区域尺寸
         const screenWidth = window.innerWidth;
-        const scannerWidth = Math.min(screenWidth * 0.85, 400); // 屏幕宽度的85%，最大400px
-        const scannerHeight = Math.round(scannerWidth * 0.6); // 宽高比 5:3 (适合条形码)
+        let scannerWidth, scannerHeight;
 
-        const html5QrCodeScanner = new Html5QrcodeScanner(
-          "qr-reader",
-          {
-            fps: 8, // 降低帧率，提高稳定性
-            // 动态计算的扫描区域：宽度接近屏幕宽度，高度按比例
-            qrbox: { width: scannerWidth, height: scannerHeight },
-            aspectRatio: 1.0,
-            // 优化扫描配置
-            rememberLastUsedCamera: true,
-            showTorchButtonIfSupported: true,
-            showZoomSliderIfSupported: true,
-            // 针对 iPhone 的优化配置
+        if (isMobile) {
+          // 移动设备：使用更大的扫描区域，特别适合一维码
+          scannerWidth = Math.min(screenWidth * 0.95, 400); // 95% 屏幕宽度
+          scannerHeight = Math.round(scannerWidth * 0.4); // 更适合一维码的比例 (2.5:1)
+        } else {
+          // 桌面设备：保持原有设置
+          scannerWidth = Math.min(screenWidth * 0.85, 300);
+          scannerHeight = Math.round(scannerWidth * 0.6);
+        }
+
+        const html5QrCode = new Html5Qrcode("qr-reader");
+
+        // 移动设备优化配置
+        const config = {
+          fps: 15,
+          qrbox: { width: scannerWidth, height: scannerHeight },
+          aspectRatio: isMobile ? 2.5 : 1.0,
+          showTorchButtonIfSupported: true,
+          showZoomSliderIfSupported: true,
+          ...(isMobile && {
             videoConstraints: {
               facingMode: "environment",
-              width: { ideal: 1280 }, // 设置理想的分辨率
-              height: { ideal: 720 },
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
+              focusMode: "continuous",
+              zoom: 1.0,
             },
-            // 移除 formatsToSupport 配置，使用默认支持所有格式
-            // 这样可以避免格式枚举值的兼容性问题
-          },
-          false
-        );
+          }),
+        };
 
-        html5QrCodeScanner.render(
-          (decodedText) => {
+        await html5QrCode.start(
+          bestCamera.id,
+          config,
+          (decodedText: string) => {
             console.log("扫描成功:", decodedText);
             setBarcode(decodedText);
             handleSearch(decodedText);
             // 立即停止扫描器，避免继续扫描
-            html5QrCodeScanner
-              .clear()
-              .then(() => {
-                console.log("扫描成功后立即清理完成");
-              })
-              .catch((error) => {
-                console.error("扫描成功后清理失败:", error);
-              });
-            setScanner(null);
-            setIsScanning(false);
+            try {
+              html5QrCode.stop();
+              setScanner(null);
+              setIsScanning(false);
+              console.log("扫描成功后立即停止");
+            } catch (error) {
+              console.error("扫描成功后停止失败:", error);
+            }
           },
-          (errorMessage) => {
+          (errorMessage: string) => {
             // 只在扫描状态下记录错误，避免清理过程中的错误
             if (isScanning) {
               // 只记录严重错误，忽略常见的解析错误
               if (
                 !errorMessage.includes("NotFoundException") &&
-                !errorMessage.includes("No MultiFormat Readers")
+                !errorMessage.includes("No MultiFormat Readers") &&
+                !errorMessage.includes("No code found")
               ) {
                 console.log("Scanning error:", errorMessage);
               }
@@ -117,12 +176,12 @@ export default function ProductSearch() {
           }
         );
 
-        setScanner(html5QrCodeScanner);
+        setScanner(html5QrCode);
       } catch (error) {
         console.error("扫码初始化失败:", error);
         setIsScanning(false);
       }
-    }, 200); // 增加延迟时间
+    }, 200);
   };
 
   const stopScanning = () => {
@@ -131,18 +190,12 @@ export default function ProductSearch() {
 
     if (scanner) {
       try {
-        // 异步清理扫描器
-        scanner
-          .clear()
-          .then(() => {
-            console.log("扫描器清理成功");
-          })
-          .catch((error) => {
-            console.error("清理扫描器失败:", error);
-          });
+        // 停止扫描器
+        scanner.stop();
         setScanner(null);
+        console.log("扫描器停止成功");
       } catch (error) {
-        console.error("清理扫描器失败:", error);
+        console.error("停止扫描器失败:", error);
       }
     }
   };
@@ -150,9 +203,11 @@ export default function ProductSearch() {
   useEffect(() => {
     return () => {
       if (scanner) {
-        scanner.clear().catch(() => {
+        try {
+          scanner.stop();
+        } catch {
           // 忽略错误
-        });
+        }
       }
     };
   }, [scanner]);
@@ -197,7 +252,7 @@ export default function ProductSearch() {
               </div>
             </div>
 
-            {isScanning && (
+            {isClient && isScanning && (
               <div className="border rounded-lg p-4">
                 <div id="qr-reader" ref={scannerRef}></div>
               </div>
