@@ -6,6 +6,7 @@ import ProductForm from "@/components/ProductForm";
 import ProductList from "@/components/ProductList";
 import ProductSearch from "@/components/ProductSearch";
 import ScanTest from "@/components/ScanTest";
+import Quagga2Test from "@/components/Quagga2Test";
 import { Toaster } from "@/components/ui/sonner";
 
 export default function Home() {
@@ -22,6 +23,7 @@ export default function Home() {
             <TabsTrigger value="list">商品列表</TabsTrigger>
             <TabsTrigger value="search">商品查询</TabsTrigger>
             <TabsTrigger value="test">扫码测试</TabsTrigger>
+            <TabsTrigger value="test2">扫码测试2</TabsTrigger>
           </TabsList>
 
           <TabsContent value="add" className="mt-6">
@@ -38,6 +40,10 @@ export default function Home() {
 
           <TabsContent value="test" className="mt-6">
             <ScanTest />
+          </TabsContent>
+
+          <TabsContent value="test2" className="mt-6">
+            <Quagga2Test />
           </TabsContent>
         </Tabs>
 
